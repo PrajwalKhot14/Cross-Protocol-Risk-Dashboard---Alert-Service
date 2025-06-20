@@ -1,0 +1,6 @@
+$address = "0x7BeA39867e4169DBe237d55C8242a8f2fcDcc387"
+$apikey = "MV9CC9PHHNB6WI3CHZWMCEAVDYJTI8MPYP"
+$url = "https://api.etherscan.io/api?module=contract&action=getabi&address=$address&apikey=$apikey"
+
+$response = Invoke-WebRequest -Uri $url | ConvertFrom-Json
+$response.result | Out-File -Encoding utf8 aave-firehose/Pool.json
