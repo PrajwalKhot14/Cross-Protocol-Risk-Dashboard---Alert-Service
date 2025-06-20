@@ -1,2 +1,6 @@
-venv\*
-.env
+venv/*
+env/*
+node_modules/*
+__pycache__/*
+Scripts/*
+Scripts/Pool-Etherscan
