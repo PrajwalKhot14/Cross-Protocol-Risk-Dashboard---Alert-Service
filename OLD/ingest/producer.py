@@ -52,13 +52,12 @@ async def main():
 
     filter_params = {
         "address": pool.address,
-        "topics": [[supply_topic, borrow_topic, repay_topic]]
+        # "topics": [[supply_topic, borrow_topic, repay_topic]]
     }
 
     # 4) handler for any incoming log
     async def handle_event(handler_context):
         log = handler_context.result
-        print("⚡  raw log received:", log)  # <— DEBUG
 
         # decode into the correct event type
         ev = None
@@ -85,7 +84,13 @@ async def main():
             "ts":      (await w3.eth.get_block(ev.blockNumber))["timestamp"],
         }
         print("✅  decoded payload:", payload)       # <— DEBUG
-        producer.send("aave-raw", key=payload["user"], value=payload)
+        def on_ack(meta):   # success
+            print(f"✔ sent to {meta.topic}@{meta.partition} offset {meta.offset}")
+
+        def on_err(exc):    # failure
+            print("❌ Kafka error:", exc)
+
+        producer.send("aave-raw", key=payload["user"], value=payload).add_callback(on_ack).add_errback(on_err)
 
     # 5) subscribe via eth_subscribe("logs", …) with our handler
     sub_id = await w3.eth.subscribe(
