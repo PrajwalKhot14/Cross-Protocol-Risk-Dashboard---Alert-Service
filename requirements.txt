@@ -1,3 +1,4 @@
 web3 
 kafka-python 
 python-dotenv
+aiokafka
