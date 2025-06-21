@@ -13,7 +13,7 @@ async def main():
     await w3.provider.connect()
 
     # load ABI & contract
-    with open("aave-firehose/Pool.json", encoding="utf-8-sig") as f:
+    with open("ingest/aave-firehose/Pool.json", encoding="utf-8-sig") as f:
         abi = json.load(f)["abi"]
     pool = w3.eth.contract(
         address="0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
