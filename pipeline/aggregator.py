@@ -7,18 +7,18 @@ from decimal import Decimal
 
 from pipeline.models import Position
 from pipeline.prices import price_cache, lts_cache
-from pipeline.consumer import state, price_cache, lts_cache
+# from pipeline.consumer import state, price_cache, lts_cache
 
 load_dotenv("env/.env")
 
 BROKERS     = os.getenv("KAFKA_BROKERS","localhost:9092").split(",")
-WINDOW_SIZE = 60    # minutes # Change this to 60
+WINDOW_SIZE = 1    # minutes # Change this to 60
 VAR_Q       = 0.01    # 1st percentile → 99% VaR
 
 
 # ── Kafka clients ─────────────────────────────────────────────────────────────
 consumer = KafkaConsumer(
-    "aave-raw", 
+    # "aave-raw", 
     "risk-deltas",
     bootstrap_servers=BROKERS,
     group_id="risk-aggregator",
