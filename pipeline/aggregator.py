@@ -12,17 +12,18 @@ from pipeline.consumer import state, price_cache, lts_cache
 load_dotenv("env/.env")
 
 BROKERS     = os.getenv("KAFKA_BROKERS","localhost:9092").split(",")
-WINDOW_SIZE = 60      # minutes # Change this to 60
+WINDOW_SIZE = 60    # minutes # Change this to 60
 VAR_Q       = 0.01    # 1st percentile → 99% VaR
 
 
 # ── Kafka clients ─────────────────────────────────────────────────────────────
 consumer = KafkaConsumer(
-    "aave-raw", "risk-deltas",
+    "aave-raw", 
+    "risk-deltas",
     bootstrap_servers=BROKERS,
     group_id="risk-aggregator",
     auto_offset_reset="latest",
-    enable_auto_commit=False,
+    # enable_auto_commit=False,
     value_deserializer=lambda v: json.loads(v.decode()),
 )
 
@@ -34,7 +35,7 @@ producer = KafkaProducer(
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 
 # In-memory state: per-user Position objects
-state = defaultdict(Position)
+# state = defaultdict(Position)
 
 # ── sliding window ──────────────────────────────────────────────────────────────
 window = deque(maxlen=WINDOW_SIZE)
