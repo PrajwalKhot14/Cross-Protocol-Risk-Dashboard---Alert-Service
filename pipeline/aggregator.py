@@ -7,11 +7,12 @@ from decimal import Decimal
 
 from pipeline.models import Position
 from pipeline.prices import price_cache, lts_cache
+from pipeline.consumer import state, price_cache, lts_cache
 
 load_dotenv("env/.env")
 
 BROKERS     = os.getenv("KAFKA_BROKERS","localhost:9092").split(",")
-WINDOW_SIZE = 5      # minutes
+WINDOW_SIZE = 60      # minutes # Change this to 60
 VAR_Q       = 0.01    # 1st percentile → 99% VaR
 
 
@@ -44,6 +45,18 @@ def compute_var(data):
     if len(data) < WINDOW_SIZE:
         return None
     return float(np.quantile(data, VAR_Q))
+
+# Helper to compute Liquidations-at-Risk (LAR)
+def compute_lar():
+    prices = price_cache()
+    lts    = lts_cache()
+    total  = 0.0
+    for pos in state.values():
+        hf = pos.health_factor(prices, lts)
+        if hf < 1:
+            # sum all debt in USD or reference currency
+            total += sum(prices[a] * q for a, q in pos.debt.items())
+    return total
 
 # ── main loop ──────────────────────────────────────────────────────────────────
 
@@ -79,17 +92,10 @@ try:
 
         # 3) Emit metrics every minute
         now = time.time()
-        if now - last_emit >= 5:
+        if now - last_emit >= 60 and len(window) == WINDOW_SIZE: # Change this to 60 
             # Calculate 99% VaR
             var = compute_var(list(window))
-            # Calculate Liquidations-at-Risk (sum of all debt for HF < 1)
-            prices = price_cache()
-            lts    = lts_cache()
-            lar = 0.0
-            for pos in state.values():
-                hf = pos.health_factor(prices, lts)
-                if hf < 1:
-                    lar += float(sum(q for q in pos.debt.values()))
+            lar = compute_lar()
 
             payload = {"ts": int(now), "var": var, "lar": lar}
             producer.send("risk-metrics", value=payload)
