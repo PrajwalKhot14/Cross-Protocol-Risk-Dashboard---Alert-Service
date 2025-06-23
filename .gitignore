@@ -3,3 +3,5 @@ env/*
 node_modules/*
 __pycache__/*
 pipeline/__pycache__/*
+start-up
+consumer.log

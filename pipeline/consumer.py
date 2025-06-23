@@ -4,7 +4,8 @@ import os, json, time, logging, requests
 from decimal import Decimal
 from collections import defaultdict
 from dotenv import load_dotenv
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
+
 
 from pipeline.models import Position
 from pipeline.prices import price_cache, lts_cache
@@ -16,6 +17,14 @@ BROKERS       = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
 SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK")
 ALERT_HF      = float(os.getenv("ALERT_HF", "1.05"))
 THROTTLE      = int(os.getenv("ALERT_THROTTLE", "3600"))  # seconds between alerts
+
+# ── NEW delta‐producer & snapshot state ─────────────────────────────────────────
+DELTA_PRODUCER = KafkaProducer(
+    bootstrap_servers=BROKERS,
+    value_serializer=lambda v: json.dumps(v).encode(),
+)
+_last_snapshot = 0.0
+_last_value    = None
 
 # ────────────────────────────────────────────────────────────────────────────
 # Logging
@@ -81,3 +90,25 @@ for msg in consumer:
 
     # Exactly-once: commit this offset now that it’s been processed
     consumer.commit()
+
+    # —— publish P&L delta every 60 s ——  
+    now = time.time()
+    if now - _last_snapshot >= 60:
+        # 1) compute total net value
+        prices = price_cache()
+        total = Decimal(0)
+        for pos in state.values():
+            coll = sum(qty * prices[a] for a, qty in pos.collateral.items())
+            debt = sum(qty * prices[a] for a, qty in pos.debt.items())
+            total += (coll - debt)
+
+        # 2) publish delta once we have an initial value
+        if _last_value is not None:
+            delta = float(total - _last_value)
+            payload = {"ts": int(now), "value": float(total), "delta": delta}
+            DELTA_PRODUCER.send("risk-deltas", value=payload)
+            DELTA_PRODUCER.flush()
+            logging.info(f"Published delta → {payload}")
+
+        _last_value    = total
+        _last_snapshot = now
