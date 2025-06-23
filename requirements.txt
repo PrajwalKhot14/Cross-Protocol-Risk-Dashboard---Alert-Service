@@ -4,3 +4,6 @@ python-dotenv
 pytest
 requests
 numpy
+pandas
+parquet
+pyarrow
