@@ -3,3 +3,4 @@ kafka-python
 python-dotenv
 pytest
 requests
+numpy
