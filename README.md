@@ -15,40 +15,40 @@ This project ingests live Aave and Compound events, computes real-time health fa
 ## Setup
 
 ### 1. **Clone repo**  
-```
+
     bash
     git clone https://github.com/your-username/risk-dashboard.git
     cd risk-dashboard
-```
+
 
 
 ### 2. Start Kafka & ZooKeeper
-```
+
     cd docker
     docker compose up -d
     docker compose ps   # verify kafka:9092 & zookeeper:2181 are Up
     cd ..
-```
+
 
 
 ### 3. Create & activate Python venv
 
-```
+
     python -m venv venv
     .\venv\Scripts\Activate.ps1  
-```
+
 
 
 
 ### 4. Create .env file
-``` 
+ 
     ALCHEMY_WS_URL=wss://eth-mainnet.g.alchemy.com/v2/XXXXXXXXXXXXXXXX
     SLACK_WEBHOOK=https://hooks.slack.com/services/…
     KAFKA_BROKERS=localhost:9092
     ETHERSCAN_KEY=API
     ALERT_HF=1.05
     ALERT_THROTTLE=3600
-```
+
 
 
 ### 5. Running the Pipeline
@@ -103,14 +103,14 @@ This project ingests live Aave and Compound events, computes real-time health fa
 ## Restarting from Scratch
 Whenever you need to bring everything back up (without wiping files):
 Stop all Python processes (Ctrl-C) and Docker containers:
-```
+
     cd docker
     docker compose down
-```
-```
+
+
     cd docker
     docker compose up -d
     cd ..
     .\venv\Scripts\Activate.ps1   # or activate venv
-```
+
 Run producer, consumer, aggregator, then snapshot + dbt in separate terminals as above.
