@@ -14,7 +14,7 @@ load_dotenv("env/.env")
 
 
 BROKERS     = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
-WINDOW_SIZE = 60
+WINDOW_SIZE = 1
 VAR_Q       = 0.01  # 99% VaR
 
 print("✅ Using group_id = risk-aggregator")
@@ -44,13 +44,19 @@ def compute_var(data):
 
 def compute_lar():
     prices = price_cache()
-    lts = lts_cache()
-    total = 0.0
+    lts    = lts_cache()
+    total  = Decimal(0)
+
     for pos in state.values():
         hf = pos.health_factor(prices, lts)
         if hf < 1:
-            total += sum(prices[a] * q for a, q in pos.debt.items())
-    return total
+            for asset, qty in pos.debt.items():
+                # qty is a Decimal, prices[asset] is a Decimal
+                total += prices[asset] * qty
+
+    # return a float for JSON serialization
+    return float(total)
+
 
 try:
     for msg in consumer:

@@ -22,7 +22,11 @@ OFFSET_FILE = OUT_DIR / f"{TOPIC}-offset.txt"
 
 # ── Load last offset ───────────────────────────────────────────────────
 if OFFSET_FILE.exists():
-    last_offset = int(OFFSET_FILE.read_text())
+    raw = OFFSET_FILE.read_text().strip()
+    try:
+        last_offset = int(raw)
+    except (ValueError, TypeError):
+        last_offset = None
 else:
     last_offset = None
 

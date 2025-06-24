@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: snapshots
+    description: "Parquet‐based Kafka snapshots"
+    tables:
+      - name: risk_metrics
+        description: "Hourly VaR & LaR metrics"
+      - name: risk_deltas
+        description: "Minute‐resolution P&L deltas"
