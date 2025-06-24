@@ -52,27 +52,27 @@ This project ingests live Aave and Compound events, computes real-time health fa
 
 
 ### 5. Running the Pipeline
-    #### 5.1. Producer: ingest raw events
-    In Terminal A
+#### 5.1. Producer: ingest raw events
+#### In Terminal A
     ```
         python ingest/producer.py
     ```
 
-    #### 5.2. Consumer: compute HF & deltas
-    In Terminal B
+#### 5.2. Consumer: compute HF & deltas
+#### In Terminal B
     ```
         python -m pipeline.consumer
     ```
 
-    #### 5.3. Aggregator: compute VaR & LaR
-    In Terminal C
+#### 5.3. Aggregator: compute VaR & LaR
+#### In Terminal C
     ```
         python -m pipeline.aggregator
     ```
 
 
 ### 6. Warehouse Layer
-    #### 6.1. Snapshot script
+#### 6.1. Snapshot script
     ```
         # Snapshot deltas
         $Env:SNAPSHOT_TOPIC="risk-deltas"    # PowerShell
@@ -86,7 +86,7 @@ This project ingests live Aave and Compound events, computes real-time health fa
         dir snapshots\*.parquet
     ```
 
-    #### 6.2. dbt models
+#### 6.2. dbt models
     ```
         cd risk_dw
         # build + test
