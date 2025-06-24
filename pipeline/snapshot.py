@@ -1,6 +1,6 @@
 # pipeline/snapshot.py
 
-import os
+import os, argparse
 import json
 import time
 from pathlib import Path
@@ -11,10 +11,16 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from dotenv import load_dotenv
 
+
+# # 1) Parse CLI args
+# parser = argparse.ArgumentParser()
+# parser.add_argument("--topic", "-t", help="Kafka topic to snapshot")
+# args = parser.parse_args()
+
 # ── CONFIG ───────────────────────────────────────────────────────────
 load_dotenv("env/.env")
 BROKERS     = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
-TOPIC       = os.getenv("SNAPSHOT_TOPIC", "risk-metrics")
+TOPIC       = os.getenv("SNAPSHOT_TOPIC", "risk-deltas")
 OUT_DIR     = Path(os.getenv("SNAPSHOT_DIR", "snapshots"))
 OUT_DIR.mkdir(exist_ok=True)
 GROUP_ID    = f"snapshotter-{TOPIC}"
