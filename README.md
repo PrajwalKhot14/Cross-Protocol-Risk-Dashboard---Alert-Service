@@ -3,7 +3,7 @@
 This project ingests live Aave and Compound events, computes real-time health factors, P&L deltas, rolling VaR (Value-at-Risk) & LaR (Liquidations-at-Risk), and warehouses both raw and aggregated data in Parquet + DuckDB/dbt.
 
 
-## 📋 Prerequisites
+## Prerequisites
 
 1. **Docker & Docker Compose**  
 2. **Python 3.10+**  
@@ -12,9 +12,9 @@ This project ingests live Aave and Compound events, computes real-time health fa
 
 ---
 
-## ⚙️ Setup
+## Setup
 
-1. **Clone repo**  
+### 1. **Clone repo**  
 ```
     bash
     git clone https://github.com/your-username/risk-dashboard.git
@@ -22,7 +22,7 @@ This project ingests live Aave and Compound events, computes real-time health fa
 ```
 
 
-2. Start Kafka & ZooKeeper
+### 2. Start Kafka & ZooKeeper
 ```
     cd docker
     docker compose up -d
@@ -31,7 +31,7 @@ This project ingests live Aave and Compound events, computes real-time health fa
 ```
 
 
-3. Create & activate Python venv
+### 3. Create & activate Python venv
 
 ```
     python -m venv venv
@@ -40,8 +40,7 @@ This project ingests live Aave and Compound events, computes real-time health fa
 
 
 
-4. Create .env file
-# env/.env
+### 4. Create .env file
 ``` 
     ALCHEMY_WS_URL=wss://eth-mainnet.g.alchemy.com/v2/XXXXXXXXXXXXXXXX
     SLACK_WEBHOOK=https://hooks.slack.com/services/…
@@ -52,28 +51,28 @@ This project ingests live Aave and Compound events, computes real-time health fa
 ```
 
 
-5. Running the Pipeline
-    5.1. Producer: ingest raw events
-    # in Terminal A
+### 5. Running the Pipeline
+    #### 5.1. Producer: ingest raw events
+    In Terminal A
     ```
         python ingest/producer.py
     ```
 
-    5.2. Consumer: compute HF & deltas
-    # in Terminal B
+    #### 5.2. Consumer: compute HF & deltas
+    In Terminal B
     ```
         python -m pipeline.consumer
     ```
 
-    5.3. Aggregator: compute VaR & LaR
-    # in Terminal C
+    #### 5.3. Aggregator: compute VaR & LaR
+    In Terminal C
     ```
         python -m pipeline.aggregator
     ```
 
 
-6. Warehouse Layer
-    6.1. Snapshot script
+### 6. Warehouse Layer
+    #### 6.1. Snapshot script
     ```
         # Snapshot deltas
         $Env:SNAPSHOT_TOPIC="risk-deltas"    # PowerShell
@@ -87,7 +86,7 @@ This project ingests live Aave and Compound events, computes real-time health fa
         dir snapshots\*.parquet
     ```
 
-    6.2. dbt models
+    #### 6.2. dbt models
     ```
         cd risk_dw
         # build + test
@@ -101,7 +100,7 @@ This project ingests live Aave and Compound events, computes real-time health fa
 
 
 
-Restarting from Scratch
+## Restarting from Scratch
 Whenever you need to bring everything back up (without wiping files):
 Stop all Python processes (Ctrl-C) and Docker containers:
 ```
