@@ -13,3 +13,4 @@ dbt-duckdb
 streamlit
 altair
 streamlit_autorefresh
+altair

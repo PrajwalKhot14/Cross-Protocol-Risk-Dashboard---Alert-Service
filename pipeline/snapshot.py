@@ -20,7 +20,13 @@ from dotenv import load_dotenv
 # ── CONFIG ───────────────────────────────────────────────────────────
 load_dotenv("env/.env")
 BROKERS     = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
-TOPIC       = os.getenv("SNAPSHOT_TOPIC", "risk-metrics") # risk-metrics, risk-deltas
+# TOPIC       = os.getenv("SNAPSHOT_TOPIC", "risk-deltas") # risk-metrics, risk-deltas
+# 1) Parse CLI args
+parser = argparse.ArgumentParser()
+parser.add_argument("--topic", "-t", required=True, help="Kafka topic to snapshot")
+args = parser.parse_args()
+TOPIC = args.topic
+
 OUT_DIR     = Path(os.getenv("SNAPSHOT_DIR", "snapshots"))
 OUT_DIR.mkdir(exist_ok=True)
 GROUP_ID    = f"snapshotter-{TOPIC}"

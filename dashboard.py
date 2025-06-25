@@ -6,13 +6,17 @@ import pandas as pd
 import streamlit as st
 from kafka import KafkaConsumer
 from streamlit_autorefresh import st_autorefresh
+import altair as alt
+
+import pytz
+local_tz = pytz.timezone("America/Chicago") 
 
 # ── Config ───────────────────────────────────────────────────────────
 BROKERS       = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
 DB_PATH       = os.getenv("DBT_DUCKDB_PATH", "risk_dw/analytics.db")
 METRIC_TOPIC  = "risk-metrics"
 DELTA_TOPIC   = "risk-deltas"
-POLL_INTERVAL = 30  # seconds between Kafka polls
+POLL_INTERVAL = 10  # seconds between Kafka polls
 
 # ── Page setup ───────────────────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Risk Dashboard")
@@ -81,7 +85,11 @@ tab1, tab2 = st.tabs(["VaR & LaR", "P&L Deltas"])
 with tab1:
     if not metrics_hist.empty:
         latest_row = metrics_hist.iloc[-1]
-
+        try:
+            if st.session_state.latest_metrics["var"] > 0.8:  # example threshold
+                st.error("🚨 High VaR alert!")
+        except:
+            pass
         col1, col2 = st.columns(2)
         with col1:
             st.metric("Current VaR (hourly)", f"{latest_row['var']:.4f}")
@@ -91,7 +99,46 @@ with tab1:
         col1, col2 = st.columns(2)
         with col1:
             st.subheader(f"VaR (last {hours}h)")
-            st.line_chart(metrics_hist.set_index("hour")["var"])
+            # Ensure datetime and timezone conversion for metrics_hist["hour"]
+            metrics_hist["hour"] = pd.to_datetime(metrics_hist["hour"])
+            if metrics_hist["hour"].dt.tz is None:
+                metrics_hist["hour"] = metrics_hist["hour"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+            else:
+                metrics_hist["hour"] = metrics_hist["hour"].dt.tz_convert(local_tz)
+
+            # Base line chart
+            var_chart = alt.Chart(metrics_hist).mark_line().encode(
+                x=alt.X("hour:T", title="Time"),
+                y=alt.Y("var:Q", title="VaR")
+            )
+
+            # Live dot overlay
+            if st.session_state.latest_metrics.get("ts"):
+                live_ts = pd.to_datetime(st.session_state.latest_metrics["ts"], unit="s")
+                if live_ts.tzinfo is None:
+                    live_ts = live_ts.tz_localize("UTC").tz_convert(local_tz)
+                else:
+                    live_ts = live_ts.tz_convert(local_tz)
+
+                var_point = pd.DataFrame({
+                    "hour": [live_ts],
+                    "var": [st.session_state.latest_metrics["var"]]
+                })
+
+                live_dot = alt.Chart(var_point).mark_circle(color="red", size=80).encode(
+                    x="hour:T",
+                    y="var:Q"
+                )
+
+                st.altair_chart(var_chart + live_dot, use_container_width=True)
+            else:
+                st.altair_chart(var_chart, use_container_width=True)
+
+                    
+
+
+
+
         with col2:
             st.subheader(f"LaR (last {hours}h)")
             st.line_chart(metrics_hist.set_index("hour")["lar"])
@@ -107,6 +154,8 @@ with tab2:
         latest_delta_row = deltas_hist.iloc[-1]
         delta_val = st.session_state.latest_delta.get("delta")
         value_val = st.session_state.latest_delta.get("value")
+        if delta_val is not None and abs(delta_val) > 1.0:  # adjust threshold
+            st.warning(f"⚠️ Large Δ detected: {delta_val:.2e}")
         
         col1, col2 = st.columns(2)
         with col1:
@@ -122,7 +171,44 @@ with tab2:
                 st.metric("Last Total Value", "N/A")
 
         st.subheader(f"P&L Δ (avg per minute, last {hours}h)")
-        st.line_chart(deltas_hist.set_index("ts_min")["avg_delta"])
+        # Convert deltas_hist timestamps to local timezone
+        deltas_hist["ts_min"] = pd.to_datetime(deltas_hist["ts_min"])
+        if deltas_hist["ts_min"].dt.tz is None:
+            deltas_hist["ts_min"] = deltas_hist["ts_min"].dt.tz_localize("UTC").dt.tz_convert(local_tz)
+        else:
+            deltas_hist["ts_min"] = deltas_hist["ts_min"].dt.tz_convert(local_tz)
+
+
+        # Historical chart
+        delta_chart = alt.Chart(deltas_hist).mark_line().encode(
+            x=alt.X("ts_min:T", title="Time"),
+            y=alt.Y("avg_delta:Q", title="Avg Δ")
+        )
+
+        # Live overlay point
+        if st.session_state.latest_delta.get("ts"):
+            live_ts = pd.to_datetime(st.session_state.latest_delta["ts"], unit="s")
+            if live_ts.tzinfo is None:
+                live_ts = live_ts.tz_localize("UTC").tz_convert(local_tz)
+            else:
+                live_ts = live_ts.tz_convert(local_tz)
+
+            delta_point = pd.DataFrame({
+                "ts_min": [live_ts],
+                "avg_delta": [st.session_state.latest_delta["delta"]]
+            })
+
+            live_delta_dot = alt.Chart(delta_point).mark_circle(color="red", size=80).encode(
+                x="ts_min:T",
+                y="avg_delta:Q"
+            )
+
+            st.altair_chart(delta_chart + live_delta_dot, use_container_width=True)
+        else:
+            st.altair_chart(delta_chart, use_container_width=True)
+
+
+
     else:
         st.warning("No Δ historical data available.")
 
