@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 # ── CONFIG ───────────────────────────────────────────────────────────
 load_dotenv("env/.env")
 BROKERS     = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
-TOPIC       = os.getenv("SNAPSHOT_TOPIC", "risk-deltas")
+TOPIC       = os.getenv("SNAPSHOT_TOPIC", "risk-metrics") # risk-metrics, risk-deltas
 OUT_DIR     = Path(os.getenv("SNAPSHOT_DIR", "snapshots"))
 OUT_DIR.mkdir(exist_ok=True)
 GROUP_ID    = f"snapshotter-{TOPIC}"

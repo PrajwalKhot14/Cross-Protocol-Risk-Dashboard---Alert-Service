@@ -10,3 +10,6 @@ pyarrow
 duckdb
 dbt-core 
 dbt-duckdb
+streamlit
+altair
+streamlit_autorefresh

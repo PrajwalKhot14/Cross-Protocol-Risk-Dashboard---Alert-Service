@@ -42,7 +42,8 @@ async def main():
             supply_evt = pool.events.Supply()
             borrow_evt = pool.events.Borrow()
             repay_evt  = pool.events.Repay()
-            event_factories = (supply_evt, borrow_evt, repay_evt)
+            liquidate_evt   = pool.events.LiquidationCall()
+            event_factories = (supply_evt, borrow_evt, repay_evt, liquidate_evt)
 
             # 3) Event handler
             async def handle_event(ctx):
@@ -55,41 +56,61 @@ async def main():
                         break
                     except MismatchedABI:
                         continue
-                if not ev:
+                if ev is None:
                     return
 
                 payload = {
                     "event":   ev.event,
                     "tx_hash": ev.transactionHash.hex(),
-                    "user":    ev.args.get("user", ev.args.get("onBehalfOf")),
-                    "asset":   ev.args["reserve"],
-                    "amount":  str(ev.args.get("amount", 0)),
                     "block":   ev.blockNumber,
                     "ts":      (await w3.eth.get_block(ev.blockNumber))["timestamp"],
                 }
                 # add extra fields
-                if ev.event == "Borrow":
+                if ev.event in ("Supply", "Borrow", "Repay"):
                     payload.update({
-                        "interestRateMode": ev.args["interestRateMode"],
-                        "borrowRate":       str(ev.args["borrowRate"]),
-                        "referralCode":     ev.args["referralCode"],
-                    })
-                elif ev.event == "Repay":
-                    payload.update({
-                        "repayer":    ev.args["repayer"],
-                        "useATokens": ev.args["useATokens"],
+                        "user":   ev.args.get("user", ev.args.get("onBehalfOf")),
+                        "asset":  ev.args["reserve"],
+                        "amount": str(ev.args.get("amount", ev.args.get("amountScaled", 0))),
                     })
 
+                    if ev.event == "Borrow":
+                        payload.update({
+                            "interestRateMode": ev.args["interestRateMode"],
+                            "borrowRate":       str(ev.args["borrowRate"]),
+                            "referralCode":     ev.args["referralCode"],
+                        })
+                    elif ev.event == "Repay":
+                        payload.update({
+                            "repayer":    ev.args["repayer"],
+                            "useATokens": ev.args["useATokens"],
+                        })
+                    out_topic = TOPIC
+
+                elif ev.event == "LiquidationCall":
+                    print("🔍 args keys:", list(ev.args.keys()))
+                    payload.update({
+                        "liquidated_user":        ev.args["user"],
+                        "liquidator":             ev.args["liquidator"],
+                        "collateral_asset":       ev.args["collateralAsset"],
+                        "debt_asset":             ev.args["liquidationAsset"],
+                        "debt_to_cover":          str(ev.args["debtToCover"]),
+                        "collateral_amount":      str(ev.args["liquidatedCollateralAmount"]),
+                        "receive_a_token":        ev.args["receiveAToken"],
+                    })
+                    out_topic = "aave-liquidations"
+                else:
+                    out_topic = TOPIC
+
                 # send to Kafka
-                producer.send(TOPIC, key=payload["user"], value=payload) \
-                        .add_callback(lambda md: logging.info(f"✔ sent {md.topic}@{md.partition}/{md.offset}")) \
-                        .add_errback(lambda e: logging.error("❌ Kafka error:", e))
+                producer.send(out_topic, key=payload["user"], value=payload) \
+                        .add_callback(lambda md: logging.info(f"Sent {md.topic}@{md.partition}/{md.offset}")) \
+                        .add_errback(lambda e: logging.error("Kafka error:", e))
 
             # 4) Subscribe
             subscription = LogsSubscription(
-                label="Aave Pool S/B/R",
+                label="Aave Pool S/B/R/L",
                 address=POOL_ADDRESS,
-                topics=[[supply_evt.topic, borrow_evt.topic, repay_evt.topic]],
+                topics=[[supply_evt.topic, borrow_evt.topic, repay_evt.topic, liquidate_evt.topic]],
                 handler=handle_event
             )
             await w3.subscription_manager.subscribe([subscription])
@@ -100,6 +121,8 @@ async def main():
 
         except (ConnectionClosedError, asyncio.IncompleteReadError, Web3Exception) as e:
             logging.warning(f"⚠️  WebSocket dropped: {e!r}. Reconnecting in 5s…")
+            producer.flush(timeout=10)
+            producer.close(timeout=10)
             await asyncio.sleep(5)
             continue
 
@@ -116,6 +139,8 @@ async def main():
                 pass
 
     logging.info("Producer terminated.")
+    producer.flush(timeout=10)
+    producer.close(timeout=10)
 
 if __name__=="__main__":
     asyncio.run(main())
