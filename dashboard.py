@@ -11,6 +11,9 @@ import altair as alt
 import pytz
 local_tz = pytz.timezone("America/Chicago") 
 
+from dotenv import load_dotenv
+load_dotenv("env/.env")
+
 # ── Config ───────────────────────────────────────────────────────────
 BROKERS       = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
 DB_PATH       = os.getenv("DBT_DUCKDB_PATH", "risk_dw/analytics.db")
@@ -20,7 +23,7 @@ POLL_INTERVAL = 10  # seconds between Kafka polls
 
 # ── Page setup ───────────────────────────────────────────────────────
 st.set_page_config(layout="wide", page_title="Risk Dashboard")
-st.title("📊 Real-Time Risk Dashboard")
+st.title("Real-Time Risk Dashboard")
 
 # ── Sidebar ───────────────────────────────────────────────────────────
 hours = st.sidebar.slider("Historical window (hours)", 1, 24, 6)
@@ -110,7 +113,11 @@ with tab1:
             var_chart = alt.Chart(metrics_hist).mark_line().encode(
                 x=alt.X("hour:T", title="Time"),
                 y=alt.Y("var:Q", title="VaR")
-            )
+            ).properties(width=700, height=400).interactive()
+            threshold_line = alt.Chart(pd.DataFrame({'y': [0.05]})).mark_rule(
+                color='red', strokeDash=[4, 4]
+            ).encode(y='y:Q')
+            
 
             # Live dot overlay
             if st.session_state.latest_metrics.get("ts"):
@@ -130,9 +137,9 @@ with tab1:
                     y="var:Q"
                 )
 
-                st.altair_chart(var_chart + live_dot, use_container_width=True)
+                st.altair_chart(var_chart + live_dot + threshold_line, use_container_width=True)
             else:
-                st.altair_chart(var_chart, use_container_width=True)
+                st.altair_chart(var_chart + threshold_line, use_container_width=True)
 
                     
 
@@ -183,7 +190,7 @@ with tab2:
         delta_chart = alt.Chart(deltas_hist).mark_line().encode(
             x=alt.X("ts_min:T", title="Time"),
             y=alt.Y("avg_delta:Q", title="Avg Δ")
-        )
+        ).properties(width=700, height=400).interactive()
 
         # Live overlay point
         if st.session_state.latest_delta.get("ts"):
@@ -222,10 +229,14 @@ if "kafka_consumer" not in st.session_state:
         METRIC_TOPIC,
         DELTA_TOPIC,
         bootstrap_servers=BROKERS,
+        security_protocol="SASL_SSL",
+        sasl_mechanism="PLAIN",
+        sasl_plain_username=os.getenv("KAFKA_USERNAME"),
+        sasl_plain_password=os.getenv("KAFKA_PASSWORD"),
         auto_offset_reset="earliest",
         enable_auto_commit=True,
         value_deserializer=lambda v: json.loads(v.decode()),
-        group_id="risk-dashboard-ui",  # ensure consumer group
+        group_id="risk-dashboard-ui",
     )
 consumer = st.session_state.kafka_consumer
 

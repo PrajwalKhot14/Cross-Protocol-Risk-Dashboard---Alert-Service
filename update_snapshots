@@ -1,0 +1,8 @@
+docker build -t prajwalriskregistry.azurecr.io/dashboard-app:latest .
+az acr login --name prajwalriskregistry
+docker push prajwalriskregistry.azurecr.io/dashboard-app:latest
+az containerapp revision list --name dashboard-app --resource-group my-dashboard-rg --output table
+az containerapp revision restart \
+  --name dashboard-app \
+  --resource-group my-dashboard-rg \
+  --revision dashboard-app--0000001  # Use latest revision name

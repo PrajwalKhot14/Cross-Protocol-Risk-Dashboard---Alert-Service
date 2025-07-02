@@ -4,11 +4,9 @@ from collections import defaultdict
 from dotenv import load_dotenv
 from kafka import KafkaConsumer, KafkaProducer
 
-# from pipeline.models import Position
 from pipeline.prices import price_cache, lts_cache
 from pipeline.state import state
 
-# ────────────────────────────────────────────────────────────────────────────
 load_dotenv("env/.env")
 BROKERS       = os.getenv("KAFKA_BROKERS", "localhost:9092").split(",")
 SLACK_WEBHOOK = os.getenv("SLACK_WEBHOOK")
@@ -17,12 +15,20 @@ THROTTLE      = int(os.getenv("ALERT_THROTTLE", "3600"))
 
 DELTA_PRODUCER = KafkaProducer(
     bootstrap_servers=BROKERS,
+    security_protocol="SASL_SSL",
+    sasl_mechanism="PLAIN",
+    sasl_plain_username=os.getenv("KAFKA_USERNAME"),
+    sasl_plain_password=os.getenv("KAFKA_PASSWORD"),
     value_serializer=lambda v: json.dumps(v).encode(),
 )
 
 consumer = KafkaConsumer(
-    "aave-raw",
+    "risk-events",  # ✅ unified topic
     bootstrap_servers=BROKERS,
+    security_protocol="SASL_SSL",
+    sasl_mechanism="PLAIN",
+    sasl_plain_username=os.getenv("KAFKA_USERNAME"),
+    sasl_plain_password=os.getenv("KAFKA_PASSWORD"),
     group_id="risk-dash-test",
     auto_offset_reset="earliest",
     enable_auto_commit=False,
@@ -44,22 +50,26 @@ def post_slack(text: str):
 
 if __name__ == "__main__":
     for msg in consumer:
-        ev    = msg.value
-        user  = ev["user"]
-        asset = ev["asset"]
-        amt   = Decimal(ev["amount"]) / Decimal(10**18)
+        ev_type = msg.value.get("type")
+        ev      = msg.value
+        user    = ev.get("user")
+        asset   = ev.get("asset")
+
+        # Skip events we can't process
+        if ev_type not in {"Supply", "Borrow", "Repay"} or not user or not asset:
+            continue
+
+        amt = Decimal(ev["amount"]) / Decimal(10**18)
 
         pos = state[user]
-        match ev.get("event"):
+        match ev_type:
             case "Supply":
                 pos.collateral[asset] = pos.collateral.get(asset, Decimal(0)) + amt
             case "Borrow":
-                pos.debt[asset]       = pos.debt.get(asset, Decimal(0))       + amt
+                pos.debt[asset] = pos.debt.get(asset, Decimal(0)) + amt
             case "Repay":
                 old = pos.debt.get(asset, Decimal(0))
-                pos.debt[asset]       = max(old - amt, Decimal(0))
-            case _:
-                pass
+                pos.debt[asset] = max(old - amt, Decimal(0))
 
         hf = pos.health_factor(price_cache(), lts_cache())
         logging.info(f"user={user[:6]} hf={hf:.2f}")
